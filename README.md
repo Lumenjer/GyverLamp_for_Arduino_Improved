@@ -1,7 +1,8 @@
 ﻿# GyverLamp for Arduino 
 
-Это облегченная версия прошивки AlexGyver под ардуино.
-(Оригинал здесь: ![Исходная версия](https://github.com/AlexGyver/GyverLamp/))
+Это облегченная версия прошивки Gyver Lamp для Arduino.
+
+Это форк прошивки от ![x-plora](https://github.com/x-plora/GyverLamp_for_Arduino), который в свою очередь является прошивки ![Norovl](https://github.com/Norovl/GyverLamp_for_Arduino), которая является форком оригинальной прошивки от ![AlexGyver](https://github.com/AlexGyver/GyverLamp/)
 
 ## Краткое описание:
 
