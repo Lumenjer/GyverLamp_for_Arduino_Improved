@@ -1,7 +1,3 @@
-#include "main.h"
-#include "button.h"
-#include "effectTicker.h"
-#include <Arduino.h>
 /*
   Скетч к проекту "Многофункциональный RGB светильник"
   Страница проекта (схемы, описания): https://alexgyver.ru/GyverLamp/
@@ -12,93 +8,193 @@
 */
 
 /*
-  Версия 1.4:
-  - Исправлен баг при смене режимов
-  - Исправлены тормоза в режиме точки доступа
+  Версия 1.5.1
+  - Оптимизировано обращение к серверу времени (нет подвисаний при отсутствии интернета)
+  - Оптимизация под пины NodeMCU
+
+  Версия 1.5.2
+  - Исправлен незначительный баг с таймером
+  - Исправлено падение по WDT при выводе IP
+  - Исправлен баг с переназначением времени будильника
+  - Исправлено переключение с первого на последний режимы
+  - Приложение автоматически получает настройки с кнопки
+  - Бегущая строка с текущим временем во время рассвета
+
+  Версия 1.5.3
+  - Увеличена плавность рассвета
+  - Поправлен баг с отображением времени рассвета
+
+  Версия 1.5.4
+  - Поправлены глюки во время рассвета
+  
+  Версия 1.5.5
+  - Поправлено невыключение света во время рассвета
+
 */
 
-//// Ссылка для менеджера плат:
-//// http://arduino.esp8266.com/stable/package_esp8266com_index.json
+/*
+  Forked by naya.vu
+ */
 
-// ---------------- БИБЛИОТЕКИ -----------------
-//#include "timerMinim.h"
-#include "config.h"
-#include <EEPROM.h>
+// Все констаны и настройки перенесены в common.h
+
+#include <Arduino.h>
 #include <FastLED.h>
 #include <GyverButton.h>
 
-// ------------------- ТИПЫ --------------------
-CRGB leds[NUM_LEDS];
-// timerMinim timeTimer(3000);
+#include "common.h"
+#include "leds.h"
+#include "effects.h"
+
 GButton touch(BTN_PIN, LOW_PULL, NORM_OPEN);
 
-// ----------------- ПЕРЕМЕННЫЕ ------------------
+boolean initialiseEffect = true;
 
-// String inputBuffer;
-static const byte maxDim = max(WIDTH, HEIGHT);
-MODE_STR modes[MODE_AMOUNT];
+byte brightness = 200;
 
-// struct {
-//  boolean state = false;
-//  int time = 0;
-//} alarm[7];
-
-// byte dawnOffsets[] = {5, 10, 15, 20, 25, 30, 40, 50, 60};
-// byte dawnMode;
-// boolean dawnFlag = false;
-// long thisTime;
-// boolean manualOff = false;
-
-int8_t currentMode = 17;
-boolean loadingFlag = true;
+boolean brightDirection;
+uint32_t effTimer;
 boolean ONflag = true;
-byte numHold;
-unsigned long numHold_Timer = 0;
-// uint32_t eepromTimer;
-// boolean settChanged = false;
-// Конфетти, Огонь, Радуга верт., Радуга гориз., Смена цвета,
-// Безумие 3D, Облака 3D, Лава 3D, Плазма 3D, Радуга 3D,
-// Павлин 3D, Зебра 3D, Лес 3D, Океан 3D,
-// colorRoutine, snowRoutine, полосы "Матрица"
 
-unsigned char matrixValue[8][16];
+int8_t currentMode = 0;
+
+#define MODE_AMOUNT 18
+
+void effectsTick() {
+    if (ONflag && millis() - effTimer >= DEFAULT_SPEED) {
+        effTimer = millis();
+        switch (currentMode) {
+            case 0: sparklesRoutine();
+                break;
+            case 1: fireRoutine(initialiseEffect);
+                break;
+            case 2: rainbowVertical();
+                break;
+            case 3: rainbowHorizontal();
+                break;
+            case 4: colorsRoutine();
+                break;
+            case 5: colorRoutine();
+                break;
+            case 6: snowRoutine();
+                break;
+            case 7: matrixRoutine();
+                break;
+            case 8: lightersRoutine(initialiseEffect);
+                break;
+            case 9: madnessNoise(initialiseEffect);
+                break;
+            case 10: rainbowNoise(initialiseEffect);
+                break;
+            case 11: rainbowStripeNoise(initialiseEffect);
+                break;
+            case 12: zebraNoise(initialiseEffect);
+                break;
+            case 13: forestNoise(initialiseEffect);
+                break;
+            case 14: oceanNoise(initialiseEffect);
+                break;
+            case 15: plasmaNoise(initialiseEffect);
+                break;
+            case 16: cloudNoise(initialiseEffect);
+                break;
+            case 17: lavaNoise(initialiseEffect);
+                break;
+        }
+        FastLED.show();
+    }
+    if (initialiseEffect) {
+        initialiseEffect = false;
+    }
+}
+
+void changePower() {
+    if (ONflag) {
+        effectsTick();
+        for (int i = 0; i < brightness; i += 8) {
+            FastLED.setBrightness(i);
+            delay(1);
+            FastLED.show();
+        }
+        FastLED.setBrightness(brightness);
+        delay(2);
+        FastLED.show();
+    } else {
+        effectsTick();
+        for (int i = brightness; i > 8; i -= 8) {
+            FastLED.setBrightness(i);
+            delay(1);
+            FastLED.show();
+        }
+        FastLED.clear();
+        delay(2);
+        FastLED.show();
+    }
+}
+
+void buttonTick() {
+    touch.tick();
+    if (touch.isSingle()) {
+        if (ONflag) {
+            ONflag = false;
+            changePower();
+        } else {
+            ONflag = true;
+            changePower();
+        }
+    }
+
+    if (ONflag && touch.isDouble()) {
+        if (++currentMode >= MODE_AMOUNT) currentMode = 0;
+        FastLED.setBrightness(brightness);
+        initialiseEffect = true;
+        FastLED.clear();
+        delay(1);
+    }
+    if (ONflag && touch.isTriple()) {
+        if (--currentMode < 0) currentMode = MODE_AMOUNT - 1;
+        FastLED.setBrightness(brightness);
+        initialiseEffect = true;
+        FastLED.clear();
+        delay(1);
+    }
+
+    if (ONflag && touch.isHolded()) {
+        brightDirection = !brightDirection;
+    }
+    if (ONflag && touch.isStep()) {
+        if (brightDirection) {
+            if (brightness < 10) brightness += 1;
+            else if (brightness < 250) brightness += 5;
+            else brightness = 255;
+        } else {
+            if (brightness > 15) brightness -= 5;
+            else if (brightness > 1) brightness -= 1;
+            else brightness = 1;
+        }
+        FastLED.setBrightness(brightness);
+    }
+}
+
 
 void setup() {
+    // ЛЕНТА
 
-  // ЛЕНТА
-  FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS) /*.setCorrection( TypicalLEDStrip )*/;
-  FastLED.setBrightness(BRIGHTNESS);
-  if (CURRENT_LIMIT > 0) {
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
-  }
-  FastLED.clear();
-  FastLED.show();
+    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+    FastLED.setBrightness(BRIGHTNESS);
+    FastLED.show();
 
-  touch.setStepTimeout(50);
-  touch.setClickTimeout(600);
-  touch.setDebounce(20);
-
-  //Serial.begin(115200);
-  //Serial.println();
-
-  if (EEPROM.read(0) == 102) { // если было сохранение настроек, то восстанавливаем их (с)НР
-    currentMode = EEPROM.read(1);
-    for (byte x = 0; x < MODE_AMOUNT; x++) {
-      modes[x].brightness = EEPROM.read(x * 3 + 11); // (2-10 байт - резерв)
-      modes[x].speed = EEPROM.read(x * 3 + 12);
-      modes[x].scale = EEPROM.read(x * 3 + 13);
+    if (CURRENT_LIMIT > 0) {
+        FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
     }
-  } else {
-    modes[17].brightness = 140;
-    modes[1].scale = 1;
-  }
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
+
+    touch.setStepTimeout(100);
+    touch.setClickTimeout(500);
+    randomSeed(micros());
+
 }
 
 void loop() {
-  effectsTick();
-  // timeTick();
-  buttonTick();
-  // yield();
+    effectsTick();
+    buttonTick();
 }

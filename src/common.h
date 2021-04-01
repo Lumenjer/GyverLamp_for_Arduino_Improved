@@ -1,15 +1,16 @@
-#pragma once
+#ifndef GYVERLAMP_ARDUINO_COMMON_H
+#define GYVERLAMP_ARDUINO_COMMON_H
+
+#include <Arduino.h>
+#include <FastLED.h>
+
 // ============= НАСТРОЙКИ =============
 
-//// -------- РАССВЕТ -------
-//#define DAWN_BRIGHT 200       // макс. яркость рассвета
-//#define DAWN_TIMEOUT 1        // сколько рассвет светит после времени будильника, минут
-
 // ---------- МАТРИЦА ---------
-#define BRIGHTNESS 80         // стандартная маскимальная яркость (0-255)
-#define CURRENT_LIMIT 2000    // лимит по току в миллиамперах, автоматически управляет яркостью (пожалей свой блок питания!) 0 - выключить лимит
+#define BRIGHTNESS 40         // стандартная маскимальная яркость (0-255)
+#define CURRENT_LIMIT 2500    // лимит по току в миллиамперах, автоматически управляет яркостью (пожалей свой блок питания!) 0 - выключить лимит
 
-#define WIDTH 16              // ширина матрицы
+#define WIDTH 24              // ширина матрицы
 #define HEIGHT 16             // высота матрицы
 
 #define COLOR_ORDER GRB       // порядок цветов на ленте. Если цвет отображается некорректно - меняйте. Начать можно с RGB
@@ -20,11 +21,19 @@
 // при неправильной настройке матрицы вы получите предупреждение "Wrong matrix parameters! Set to default"
 // шпаргалка по настройке матрицы здесь! https://alexgyver.ru/matrix_guide/
 
-#define numHold_Time 1500     // время отображения индикатора уровня яркости/скорости/масштаба
-
 // ============= ДЛЯ РАЗРАБОТЧИКОВ =============
-#define LED_PIN 2             // пин ленты
-#define BTN_PIN 4
-#define MODE_AMOUNT 18
+#define LED_TYPE WS2811       // тип ленты (WS2811, WS2812B)
+#define LED_PIN 4             // пин ленты
+#define BTN_PIN 2
+
 #define NUM_LEDS WIDTH * HEIGHT
 #define SEGMENTS 1            // диодов в одном "пикселе" (для создания матрицы из кусков ленты)
+
+#define DEFAULT_SPEED 45
+
+// ---------------- БИБЛИОТЕКИ -----------------
+#define FASTLED_INTERRUPT_RETRY_COUNT 0
+#define FASTLED_ALLOW_INTERRUPTS 0
+#define FASTLED_ESP8266_RAW_PIN_ORDER
+
+#endif
