@@ -1,8 +1,8 @@
 ﻿# GyverLamp for Arduino 
 
-Это облегченная версия прошивки Gyver Lamp для Arduino.
+Это оптимизированная версия прошивки Gyver Lamp для Arduino.
 
-Это форк прошивки от ![x-plora](https://github.com/x-plora/GyverLamp_for_Arduino), который в свою очередь является прошивки ![Norovl](https://github.com/Norovl/GyverLamp_for_Arduino), которая является форком оригинальной прошивки от ![AlexGyver](https://github.com/AlexGyver/GyverLamp/)
+Это форк прошивки от ![x-plora](https://github.com/x-plora/GyverLamp_for_Arduino), который в свою очередь является форком прошивки ![Norovl](https://github.com/Norovl/GyverLamp_for_Arduino), которая является форком оригинальной прошивки от ![AlexGyver](https://github.com/AlexGyver/GyverLamp/)
 
 ## Краткое описание:
 
@@ -33,3 +33,7 @@
 на аналогичную с этого сайта. Совместимость с оригиналом сохранилась.
 
 Подключение ардуино производить к тем же пинам, что и esp8266.
+
+## Компиляция и загрузка прошивки
+
+`pio run -t upload`

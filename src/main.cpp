@@ -40,65 +40,107 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include <GyverButton.h>
 
-#include "common.h"
-#include "leds.h"
+#include "constants.h"
 #include "effects.h"
+#include "leds.h"
+#include "button.h"
+#include "common.h"
 
-GButton touch(BTN_PIN, LOW_PULL, NORM_OPEN);
+boolean brightnessDirection;
+int8_t brightnessLevel = 5; // 0-7
 
-boolean initialiseEffect = true;
-
-byte brightness = 200;
-
-boolean brightDirection;
 uint32_t effTimer;
-boolean ONflag = true;
+boolean powerOn = false;
 
-int8_t currentMode = 0;
+enum Effects {
+    SPARKLES_EFFECT,
+    FIRE_EFFECT,
+    RAINBOW_VERTICAL_EFFECT,
+    RAINBOW_HORIZONTAL_EFFECT,
+    COLORS_EFFECT,
+    SINGLE_COLOR_EFFECT,
+    SNOW_EFFECT,
+    MATRIX_EFFECT,
+    LIGHTERS_EFFECT,
+    MADNESS_NOISE_EFFECT,
+    RAINBOW_NOISE_EFFECT,
+    RAINBOW_STRIPE_NOISE_EFFECT,
+    ZEBRA_NOISE_EFFECT,
+    FOREST_NOISE_EFFECT,
+    OCEAN_NOISE_EFFECT,
+    PLASMA_NOISE_EFFECT,
+    CLOUD_NOISE_EFFECT,
+    LAVA_NOISE_EFFECT
+};
+#define NUM_EFFECTS 18
 
-#define MODE_AMOUNT 18
+byte currentEffect = SPARKLES_EFFECT;
+boolean initialiseEffect = true; // shows if it is a first iteration
+
+inline void setBrightness() {
+    FastLED.setBrightness(brightnessLevel * 32 + 31);
+}
 
 void effectsTick() {
-    if (ONflag && millis() - effTimer >= DEFAULT_SPEED) {
-        effTimer = millis();
-        switch (currentMode) {
-            case 0: sparklesRoutine();
+    uint32_t now = millis();
+    if (powerOn && timeDiff(now, effTimer) >= DEFAULT_SPEED) {
+        effTimer = now;
+
+        switch (currentEffect) {
+            case SPARKLES_EFFECT:
+                sparklesRoutine();
                 break;
-            case 1: fireRoutine(initialiseEffect);
+            case FIRE_EFFECT:
+                fireRoutine(initialiseEffect);
                 break;
-            case 2: rainbowVertical();
+            case RAINBOW_VERTICAL_EFFECT:
+                rainbowVertical();
                 break;
-            case 3: rainbowHorizontal();
+            case RAINBOW_HORIZONTAL_EFFECT:
+                rainbowHorizontal();
                 break;
-            case 4: colorsRoutine();
+            case COLORS_EFFECT:
+                colorsRoutine();
                 break;
-            case 5: colorRoutine();
+            case SINGLE_COLOR_EFFECT:
+                singleColorRoutine();
                 break;
-            case 6: snowRoutine();
+            case SNOW_EFFECT:
+                snowRoutine();
                 break;
-            case 7: matrixRoutine();
+            case MATRIX_EFFECT:
+                matrixRoutine();
                 break;
-            case 8: lightersRoutine(initialiseEffect);
+            case LIGHTERS_EFFECT:
+                lightersRoutine(initialiseEffect);
                 break;
-            case 9: madnessNoise(initialiseEffect);
+            case MADNESS_NOISE_EFFECT:
+                madnessNoise(initialiseEffect);
                 break;
-            case 10: rainbowNoise(initialiseEffect);
+            case RAINBOW_NOISE_EFFECT:
+                rainbowNoise(initialiseEffect);
                 break;
-            case 11: rainbowStripeNoise(initialiseEffect);
+            case RAINBOW_STRIPE_NOISE_EFFECT:
+                rainbowStripeNoise(initialiseEffect);
                 break;
-            case 12: zebraNoise(initialiseEffect);
+            case ZEBRA_NOISE_EFFECT:
+                zebraNoise(initialiseEffect);
                 break;
-            case 13: forestNoise(initialiseEffect);
+            case FOREST_NOISE_EFFECT:
+                forestNoise(initialiseEffect);
                 break;
-            case 14: oceanNoise(initialiseEffect);
+            case OCEAN_NOISE_EFFECT:
+                oceanNoise(initialiseEffect);
                 break;
-            case 15: plasmaNoise(initialiseEffect);
+            case PLASMA_NOISE_EFFECT:
+                plasmaNoise(initialiseEffect);
                 break;
-            case 16: cloudNoise(initialiseEffect);
+            case CLOUD_NOISE_EFFECT:
+                cloudNoise(initialiseEffect);
                 break;
-            case 17: lavaNoise(initialiseEffect);
+            case LAVA_NOISE_EFFECT:
+                lavaNoise(initialiseEffect);
                 break;
         }
         FastLED.show();
@@ -109,92 +151,121 @@ void effectsTick() {
 }
 
 void changePower() {
-    if (ONflag) {
-        effectsTick();
-        for (int i = 0; i < brightness; i += 8) {
+    powerOn = !powerOn;
+
+    effectsTick();
+
+    if (powerOn) {
+        uint8_t brightness = brightnessLevel * 32 + 31;
+        for (int i = 0; i < brightnessLevel; i += 8) {
             FastLED.setBrightness(i);
             delay(1);
             FastLED.show();
         }
         FastLED.setBrightness(brightness);
-        delay(2);
-        FastLED.show();
     } else {
-        effectsTick();
+        uint8_t brightness = brightnessLevel * 32 + 31;
         for (int i = brightness; i > 8; i -= 8) {
             FastLED.setBrightness(i);
             delay(1);
             FastLED.show();
         }
         FastLED.clear();
-        delay(2);
-        FastLED.show();
     }
+
+    delay(2);
+    FastLED.show();
 }
 
 void buttonTick() {
-    touch.tick();
-    if (touch.isSingle()) {
-        if (ONflag) {
-            ONflag = false;
-            changePower();
-        } else {
-            ONflag = true;
-            changePower();
-        }
+    if (!Button::hasEvent()) {
+        return;
     }
 
-    if (ONflag && touch.isDouble()) {
-        if (++currentMode >= MODE_AMOUNT) currentMode = 0;
-        FastLED.setBrightness(brightness);
-        initialiseEffect = true;
-        FastLED.clear();
-        delay(1);
-    }
-    if (ONflag && touch.isTriple()) {
-        if (--currentMode < 0) currentMode = MODE_AMOUNT - 1;
-        FastLED.setBrightness(brightness);
-        initialiseEffect = true;
-        FastLED.clear();
-        delay(1);
+    Button::Event event = Button::pullEvent();
+    if (!event.type) {
+        return;
     }
 
-    if (ONflag && touch.isHolded()) {
-        brightDirection = !brightDirection;
-    }
-    if (ONflag && touch.isStep()) {
-        if (brightDirection) {
-            if (brightness < 10) brightness += 1;
-            else if (brightness < 250) brightness += 5;
-            else brightness = 255;
-        } else {
-            if (brightness > 15) brightness -= 5;
-            else if (brightness > 1) brightness -= 1;
-            else brightness = 1;
+    if (event.type == Button::EVENT_CLICKS) {
+        switch (event.value) {
+            case 1:
+                changePower();
+                break;
+
+            case 2:
+                if (currentEffect == NUM_EFFECTS - 1) {
+                    currentEffect = 0;
+                } else {
+                    currentEffect++;
+                }
+                initialiseEffect = true;
+                FastLED.clear();
+                delay(1);
+                setBrightness();
+
+                break;
+
+            case 3:
+                if (currentEffect == 0) {
+                    currentEffect = NUM_EFFECTS - 1;
+                } else {
+                    currentEffect--;
+                }
+                initialiseEffect = true;
+                FastLED.clear();
+                delay(1);
+                setBrightness();
+
+                break;
+
+            case 4:
+                // save settings
+                break;
+
+            default:
+                return;
         }
-        FastLED.setBrightness(brightness);
+    } else if (event.type == Button::EVENT_HOLDING) {
+        if (event.value == 1) {
+            brightnessDirection = !brightnessDirection;
+        }
+
+        brightnessLevel += brightnessDirection ? 1 : -1;
+
+        if (brightnessLevel >= 8) {
+            brightnessLevel = 7;
+            flash(2, 100);
+        } else if (brightnessLevel < 0) {
+            brightnessLevel = 0;
+            flash(2, 100);
+        }
+
+        setBrightness();
+    } else if (event.type == Button::EVENT_BOOT_HELD) {
+        // reset EEPROM
+        flash(5, 100);
     }
 }
 
-
 void setup() {
-    // ЛЕНТА
-
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-    FastLED.setBrightness(BRIGHTNESS);
+    FastLED.setBrightness(DEFAULT_BRIGHTNESS);
     FastLED.show();
 
     if (CURRENT_LIMIT > 0) {
         FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
     }
 
-    touch.setStepTimeout(100);
-    touch.setClickTimeout(500);
-    randomSeed(micros());
+    Button::setup(BTN_PIN);
 
+    randomSeed(micros());
 }
 
 void loop() {
     effectsTick();
+
+    Button::loop();
+
     buttonTick();
 }

@@ -36,7 +36,7 @@ void colorsRoutine();
 // --------------------------------- ЦВЕТ ------------------------------------
 
 #define COLOR_SCALE 60
-void colorRoutine();
+void singleColorRoutine();
 
 // ------------------------------ снегопад 2.0 --------------------------------
 #define SNOW_SCALE 40

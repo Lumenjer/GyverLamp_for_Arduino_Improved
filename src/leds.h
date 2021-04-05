@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include "common.h"
+#include "constants.h"
 
 // функции для работы с LED-матрицей
 
@@ -34,5 +34,8 @@ uint16_t getPixelNumber(uint8_t x, uint8_t y);
 
 // очистить матрицу пикселей
 void clearPixels();
+
+//
+void flash(byte num, unsigned int interval);
 
 #endif //GYVERLAMP_ARDUINO_LEDS_H

@@ -171,8 +171,9 @@ void rainbowVertical() {
     hue += 2;
     for (byte j = 0; j < HEIGHT; j++) {
         CHSV thisColor = CHSV((byte)(hue + j * RAINBOW_VERTICAL_SCALE), 255, 255);
-        for (byte i = 0; i < WIDTH; i++)
+        for (byte i = 0; i < WIDTH; i++) {
             drawPixelXY(i, j, thisColor);
+        }
     }
 }
 
@@ -180,8 +181,9 @@ void rainbowHorizontal() {
     hue += 2;
     for (byte i = 0; i < WIDTH; i++) {
         CHSV thisColor = CHSV((byte)(hue + i * RAINBOW_HORIZONTAL_SCALE), 255, 255);
-        for (byte j = 0; j < HEIGHT; j++)
-            drawPixelXY(i, j, thisColor);   //leds[getPixelNumber(i, j)] = thisColor;
+        for (byte j = 0; j < HEIGHT; j++) {
+            drawPixelXY(i, j, thisColor);
+        }
     }
 }
 
@@ -194,7 +196,7 @@ void colorsRoutine() {
 }
 
 // --------------------------------- ЦВЕТ ------------------------------------
-void colorRoutine() {
+void singleColorRoutine() {
     for (uint16_t i = 0; i < NUM_LEDS; i++) {
         drawPixel(i, CHSV(COLOR_SCALE * 2.5, 255, 255));
     }
@@ -256,7 +258,9 @@ void lightersRoutine(bool initialise) {
         }
     }
     clearPixels();
-    if (++d.lighters.loopCounter > 20) d.lighters.loopCounter = 0;
+    if (++d.lighters.loopCounter > 20) {
+        d.lighters.loopCounter = 0;
+    }
     for (byte i = 0; i < LIGHTERS_SCALE; i++) {
         if (d.lighters.loopCounter == 0) {     // меняем скорость каждые 255 отрисовок
             d.lighters.lightersSpeed[0][i] += random(-3, 4);

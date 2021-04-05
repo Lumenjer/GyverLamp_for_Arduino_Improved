@@ -112,3 +112,18 @@ uint16_t getPixelNumber(uint8_t x, uint8_t y) {
 void clearPixels() {
     FastLED.clear();
 }
+
+void flash(byte num, unsigned int interval) {
+    for (uint16_t i = 0; i < NUM_LEDS; i++) {
+        drawPixel(i, CRGB(0xFFFFFF));
+    }
+    for (byte n = 0; n < num; n++) {
+        FastLED.setBrightness(64);
+        FastLED.show();
+        delay(interval);
+        FastLED.setBrightness(0);
+        FastLED.show();
+        delay(interval);
+    }
+    clearPixels();
+}
