@@ -26,7 +26,9 @@ void drawPixel(uint16_t pixNum, CRGB color) {
 
 // функция отрисовки точки по координатам X Y
 void drawPixelXY(uint8_t x, uint8_t y, CRGB color) {
-    if (x < 0 || x > WIDTH - 1 || y < 0 || y > HEIGHT - 1) return;
+    if (x < 0 || x > WIDTH - 1 || y < 0 || y > HEIGHT - 1) {
+        return;
+    }
     uint16_t thisPixel = getPixelNumber(x, y) * SEGMENTS;
     for (byte i = 0; i < SEGMENTS; i++) {
         leds[thisPixel + i] = color;
@@ -35,14 +37,18 @@ void drawPixelXY(uint8_t x, uint8_t y, CRGB color) {
 
 CRGB getPixelValue(uint16_t pixNum) {
     uint16_t thisPixel = pixNum * SEGMENTS;
-    if (thisPixel < 0 || thisPixel > NUM_LEDS - 1) return 0;
+    if (thisPixel < 0 || thisPixel > NUM_LEDS - 1) {
+        return 0;
+    }
     return leds[thisPixel];
 }
 
 // функция получения цвета пикселя по его номеру
 uint32_t getPixelColor(uint8_t pixNum) {
     uint16_t thisPixel = pixNum * SEGMENTS;
-    if (thisPixel < 0 || thisPixel > NUM_LEDS - 1) return 0;
+    if (thisPixel < 0 || thisPixel > NUM_LEDS - 1) {
+        return 0;
+    }
     return (((uint32_t)leds[thisPixel].r << 16) | ((long)leds[thisPixel].g << 8 ) | (long)leds[thisPixel].b);
 }
 
@@ -109,7 +115,7 @@ uint16_t getPixelNumber(uint8_t x, uint8_t y) {
     }
 }
 
-void clearPixels() {
+inline void clearPixels() {
     FastLED.clear();
 }
 
@@ -118,7 +124,7 @@ void flash(byte num, unsigned int interval) {
         drawPixel(i, CRGB(0xFFFFFF));
     }
     for (byte n = 0; n < num; n++) {
-        FastLED.setBrightness(64);
+        FastLED.setBrightness(16);
         FastLED.show();
         delay(interval);
         FastLED.setBrightness(0);

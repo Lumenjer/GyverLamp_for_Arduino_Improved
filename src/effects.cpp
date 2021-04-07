@@ -165,12 +165,11 @@ void fireRoutine(bool initialise) {
 }
 
 // ---------------------------------------- радуга ------------------------------------------
-byte hue;
 
 void rainbowVertical() {
-    hue += 2;
+    d.hue += 2;
     for (byte j = 0; j < HEIGHT; j++) {
-        CHSV thisColor = CHSV((byte)(hue + j * RAINBOW_VERTICAL_SCALE), 255, 255);
+        CHSV thisColor = CHSV((byte)(d.hue + j * RAINBOW_VERTICAL_SCALE), 255, 255);
         for (byte i = 0; i < WIDTH; i++) {
             drawPixelXY(i, j, thisColor);
         }
@@ -178,9 +177,9 @@ void rainbowVertical() {
 }
 
 void rainbowHorizontal() {
-    hue += 2;
+    d.hue += 2;
     for (byte i = 0; i < WIDTH; i++) {
-        CHSV thisColor = CHSV((byte)(hue + i * RAINBOW_HORIZONTAL_SCALE), 255, 255);
+        CHSV thisColor = CHSV((byte)(d.hue + i * RAINBOW_HORIZONTAL_SCALE), 255, 255);
         for (byte j = 0; j < HEIGHT; j++) {
             drawPixelXY(i, j, thisColor);
         }
@@ -189,9 +188,9 @@ void rainbowHorizontal() {
 
 // ---------------------------------------- ЦВЕТА ------------------------------------------
 void colorsRoutine() {
-    hue += 1;
+    d.hue += 1;
     for (uint16_t i = 0; i < NUM_LEDS; i++) {
-        drawPixel(i, CHSV(hue, 255, 255));
+        drawPixel(i, CHSV(d.hue, 255, 255));
     }
 }
 
@@ -247,6 +246,7 @@ void matrixRoutine() {
 // ----------------------------- СВЕТЛЯКИ ------------------------------
 
 void lightersRoutine(bool initialise) {
+
     if (initialise) {
         randomSeed(millis());
         for (byte i = 0; i < LIGHTERS_AM; i++) {
@@ -293,21 +293,45 @@ void lightersRoutine(bool initialise) {
 
 // ================================= ШУМОВЫЕ ЭФФЕКТЫ ====================================
 
-// The 16 bit version of our coordinates
+inline uint8_t getNoiseDataValue(uint16_t i, uint16_t j) {
+    if (j >= MIN_DIMENSION) {
+        if (i >= MIN_DIMENSION) {
+            // this should not happen
+            return 0;
+        } else {
+            return d.noise.data2[i][j - MIN_DIMENSION];
+        }
+    } else {
+        return d.noise.data[i][j];
+    }
+}
 
-uint16_t speed = 20; // speed is set dynamically once we've started up
-uint16_t scale = 30; // scale is set dynamically once we've started up
+inline void setNoiseDataValue(uint16_t i, uint16_t j, uint8_t value) {
+    if (j >= MIN_DIMENSION) {
+        if (i >= MIN_DIMENSION) {
+            // this should not happen
+            return;
+        } else {
+            d.noise.data2[i][j - MIN_DIMENSION] = value;
+        }
+    } else {
+        d.noise.data[i][j] = value;
+    }
+}
 
 // ******************* СЛУЖЕБНЫЕ *******************
 void fillNoiseLED() {
     uint8_t dataSmoothing = 0;
-    if (speed < 50) {
-        dataSmoothing = 200 - (speed * 4);
+    if (d.noise.speed < 50) {
+        dataSmoothing = 200 - (d.noise.speed * 4);
     }
     for (uint16_t i = 0; i < MAX_DIMENSION; i++) {
-        int ioffset = scale * i;
+        uint16_t ioffset = d.noise.scale * i;
         for (uint16_t j = 0; j < MAX_DIMENSION; j++) {
-            int joffset = scale * j;
+            if (i >= MIN_DIMENSION && j >= MIN_DIMENSION) {
+                continue;
+            }
+            uint16_t joffset = d.noise.scale * j;
 
             uint8_t data = inoise8(d.noise.x + ioffset, d.noise.y + joffset, d.noise.z);
 
@@ -315,24 +339,24 @@ void fillNoiseLED() {
             data = qadd8(data, scale8(data, 39));
 
             if (dataSmoothing) {
-                uint8_t olddata = d.noise.data[i][j];
+                uint8_t olddata = getNoiseDataValue(i, j);
                 uint8_t newdata = scale8( olddata, dataSmoothing) + scale8( data, 256 - dataSmoothing);
                 data = newdata;
             }
 
-            d.noise.data[i][j] = data;
+            setNoiseDataValue(i, j, data);
         }
     }
-    d.noise.z += speed;
+    d.noise.z += d.noise.speed;
 
     // apply slow drift to X and Y, just for visual variation.
-    d.noise.x += speed / 8;
-    d.noise.y -= speed / 16;
+    d.noise.x += d.noise.speed / 8;
+    d.noise.y -= d.noise.speed / 16;
 
     for (uint8_t i = 0; i < WIDTH; i++) {
         for (uint8_t j = 0; j < HEIGHT; j++) {
-            uint8_t index = d.noise.data[j][i];
-            uint8_t bri =   d.noise.data[i][j];
+            uint8_t index = getNoiseDataValue(j, i);
+            uint8_t bri = getNoiseDataValue(i, j);
             // if this palette is a 'loop', add a slowly-changing base value
             if (d.noise.colorLoop) {
                 index += d.noise.ihue;
@@ -345,7 +369,7 @@ void fillNoiseLED() {
                 bri = dim8_raw(bri * 2);
             }
             CRGB color = ColorFromPalette(d.noise.currentPalette, index, bri);
-            drawPixelXY(i, j, color);   //leds[getPixelNumber(i, j)] = color;
+            drawPixelXY(i, j, color);
         }
     }
     d.noise.ihue += 1;
@@ -353,24 +377,28 @@ void fillNoiseLED() {
 
 void fillnoise8() {
     for (uint16_t i = 0; i < MAX_DIMENSION; i++) {
-        uint16_t ioffset = scale * i;
+        uint16_t ioffset = d.noise.scale * i;
         for (uint16_t j = 0; j < MAX_DIMENSION; j++) {
-            uint16_t joffset = scale * j;
-            d.noise.data[i][j] = inoise8(d.noise.x + ioffset, d.noise.y + joffset, d.noise.z);
+            if (i >= MIN_DIMENSION && j >= MIN_DIMENSION) {
+                continue;
+            }
+
+            uint16_t joffset = d.noise.scale * j;
+            setNoiseDataValue(i, j, inoise8(d.noise.x + ioffset, d.noise.y + joffset, d.noise.z));
         }
     }
-    d.noise.z += speed;
+    d.noise.z += d.noise.speed;
 }
 
 void madnessNoise(bool initialise) {
     if (initialise) {
-        scale = MADNESS_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = MADNESS_SCALE;
+        d.noise.speed = MADNESS_SPEED;
     }
     fillnoise8();
     for (uint8_t i = 0; i < WIDTH; i++) {
         for (uint8_t j = 0; j < HEIGHT; j++) {
-            CRGB thisColor = CHSV(d.noise.data[j][i], 255, d.noise.data[i][j]);
+            CRGB thisColor = CHSV(getNoiseDataValue(j, i), 255, getNoiseDataValue(i, j));
             drawPixelXY(i, j, thisColor);
         }
     }
@@ -379,8 +407,8 @@ void madnessNoise(bool initialise) {
 void rainbowNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = RainbowColors_p;
-        scale = RAINBOW_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = RAINBOW_SCALE;
+        d.noise.speed = RAINBOW_SPEED;
         d.noise.colorLoop = 1;
     }
     fillNoiseLED();
@@ -388,8 +416,8 @@ void rainbowNoise(bool initialise) {
 void rainbowStripeNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = RainbowStripeColors_p;
-        scale = RAINBOW_S_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = RAINBOW_STRIPE_SCALE;
+        d.noise.speed = RAINBOW_STRIPE_SPEED;
         d.noise.colorLoop = 1;
     }
     fillNoiseLED();
@@ -403,8 +431,8 @@ void zebraNoise(bool initialise) {
         d.noise.currentPalette[4] = CRGB::White;
         d.noise.currentPalette[8] = CRGB::White;
         d.noise.currentPalette[12] = CRGB::White;
-        scale = ZEBRA_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = ZEBRA_SCALE;
+        d.noise.speed = ZEBRA_SPEED;
         d.noise.colorLoop = 1;
     }
     fillNoiseLED();
@@ -412,8 +440,8 @@ void zebraNoise(bool initialise) {
 void forestNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = ForestColors_p;
-        scale = FOREST_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = FOREST_SCALE;
+        d.noise.speed = FOREST_SPEED;
         d.noise.colorLoop = 0;
     }
     fillNoiseLED();
@@ -421,8 +449,8 @@ void forestNoise(bool initialise) {
 void oceanNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = OceanColors_p;
-        scale = OCEAN_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = OCEAN_SCALE;
+        d.noise.speed = OCEAN_SPEED;
         d.noise.colorLoop = 0;
     }
 
@@ -431,8 +459,8 @@ void oceanNoise(bool initialise) {
 void plasmaNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = PartyColors_p;
-        scale = PLASMA_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = PLASMA_SCALE;
+        d.noise.speed = PLASMA_SPEED;
         d.noise.colorLoop = 1;
     }
     fillNoiseLED();
@@ -440,8 +468,8 @@ void plasmaNoise(bool initialise) {
 void cloudNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = CloudColors_p;
-        scale = CLOUD_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = CLOUD_SCALE;
+        d.noise.speed = CLOUD_SPEED;
         d.noise.colorLoop = 0;
     }
     fillNoiseLED();
@@ -449,8 +477,8 @@ void cloudNoise(bool initialise) {
 void lavaNoise(bool initialise) {
     if (initialise) {
         d.noise.currentPalette = LavaColors_p;
-        scale = LAVA_SCALE;
-        speed = DEFAULT_SPEED;
+        d.noise.scale = LAVA_SCALE;
+        d.noise.speed = LAVA_SPEED;
         d.noise.colorLoop = 0;
     }
     fillNoiseLED();

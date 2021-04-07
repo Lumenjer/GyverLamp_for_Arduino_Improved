@@ -27,18 +27,18 @@
 // период (мс), с которым генерируется событие (тик) при зажатии кнопки
 #define BUTTON_HOLDING_TICKS_PERIOD 500
 
+#define BUTTON_EVENT_NONE 0
+#define BUTTON_EVENT_CLICKS 1 // кнопка была нажата N раз подряд
+#define BUTTON_EVENT_HOLDING 2 // кнопка удерживается
+#define BUTTON_EVENT_BOOT_HELD 3 // кнопка удерживалась во время запуска микроконтроллера
+
+
 namespace Button {
 
-    enum EventType {
-        EVENT_NONE = 0,
-        EVENT_CLICKS, // кнопка была нажата N раз подряд
-        EVENT_HOLDING, // кнопка удерживается
-        EVENT_BOOT_HELD // кнопка удерживалась во время запуска микроконтроллера
-    };
-
     struct Event {
-        enum EventType type = EVENT_NONE;
-        byte value = 0;
+        byte type = BUTTON_EVENT_NONE;
+        byte clicks = 0;
+        byte holdingTicks;
     };
 
     void setup(uint8_t pin);

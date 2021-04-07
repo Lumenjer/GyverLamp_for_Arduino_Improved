@@ -1,45 +1,20 @@
 /*
-  Скетч к проекту "Многофункциональный RGB светильник"
-  Страница проекта (схемы, описания): https://alexgyver.ru/GyverLamp/
-  Исходники на GitHub: https://github.com/AlexGyver/GyverLamp/
-  Нравится, как написан код? Поддержи автора! https://alexgyver.ru/support_alex/
-  Автор: AlexGyver, AlexGyver Technologies, 2019
-  https://AlexGyver.ru/
-*/
-
-/*
-  Версия 1.5.1
-  - Оптимизировано обращение к серверу времени (нет подвисаний при отсутствии интернета)
-  - Оптимизация под пины NodeMCU
-
-  Версия 1.5.2
-  - Исправлен незначительный баг с таймером
-  - Исправлено падение по WDT при выводе IP
-  - Исправлен баг с переназначением времени будильника
-  - Исправлено переключение с первого на последний режимы
-  - Приложение автоматически получает настройки с кнопки
-  - Бегущая строка с текущим временем во время рассвета
-
-  Версия 1.5.3
-  - Увеличена плавность рассвета
-  - Поправлен баг с отображением времени рассвета
-
-  Версия 1.5.4
-  - Поправлены глюки во время рассвета
-  
-  Версия 1.5.5
-  - Поправлено невыключение света во время рассвета
-
-*/
-
-/*
-  Forked by naya.vu
+ * Облегчённая и оптимизированная прошивка GyverLamp для Arduino
+ * Изменено и доработано: NayaVu 2021, https://naya.vu/
+ *
+ * Это форк прошивки от x-plora (https://github.com/x-plora/GyverLamp_for_Arduino),
+ * который в свою очередь является форком прошивки от Norovl (https://github.com/Norovl/GyverLamp_for_Arduino),
+ * которая является форком оригинальной прошивки от  AlexGyver (https://github.com/AlexGyver/GyverLamp/)
+ *
+ * Автор: AlexGyver, AlexGyver Technologies, 2019
+ * https://AlexGyver.ru/
  */
 
 // Все констаны и настройки перенесены в common.h
 
 #include <Arduino.h>
 #include <FastLED.h>
+#include <EEPROM.h>
 
 #include "constants.h"
 #include "effects.h"
@@ -47,44 +22,65 @@
 #include "button.h"
 #include "common.h"
 
-boolean brightnessDirection;
-int8_t brightnessLevel = 5; // 0-7
+#define SPARKLES_EFFECT 0
+#define FIRE_EFFECT 1
+#define RAINBOW_VERTICAL_EFFECT 2
+#define RAINBOW_HORIZONTAL_EFFECT 3
+#define COLORS_EFFECT 4
+#define SINGLE_COLOR_EFFECT 5
+#define SNOW_EFFECT 6
+#define MATRIX_EFFECT 7
+#define LIGHTERS_EFFECT 8
+#define MADNESS_NOISE_EFFECT 9
+#define RAINBOW_NOISE_EFFECT 10
+#define RAINBOW_STRIPE_NOISE_EFFECT 11
+#define ZEBRA_NOISE_EFFECT 12
+#define FOREST_NOISE_EFFECT 13
+#define OCEAN_NOISE_EFFECT 14
+#define PLASMA_NOISE_EFFECT 15
+#define CLOUD_NOISE_EFFECT 16
+#define LAVA_NOISE_EFFECT 17
 
-uint32_t effTimer;
-boolean powerOn = false;
-
-enum Effects {
-    SPARKLES_EFFECT,
-    FIRE_EFFECT,
-    RAINBOW_VERTICAL_EFFECT,
-    RAINBOW_HORIZONTAL_EFFECT,
-    COLORS_EFFECT,
-    SINGLE_COLOR_EFFECT,
-    SNOW_EFFECT,
-    MATRIX_EFFECT,
-    LIGHTERS_EFFECT,
-    MADNESS_NOISE_EFFECT,
-    RAINBOW_NOISE_EFFECT,
-    RAINBOW_STRIPE_NOISE_EFFECT,
-    ZEBRA_NOISE_EFFECT,
-    FOREST_NOISE_EFFECT,
-    OCEAN_NOISE_EFFECT,
-    PLASMA_NOISE_EFFECT,
-    CLOUD_NOISE_EFFECT,
-    LAVA_NOISE_EFFECT
-};
 #define NUM_EFFECTS 18
 
-byte currentEffect = SPARKLES_EFFECT;
-boolean initialiseEffect = true; // shows if it is a first iteration
+static uint32_t effTimer;
 
-inline void setBrightness() {
-    FastLED.setBrightness(brightnessLevel * 32 + 31);
+static byte currentEffect = SPARKLES_EFFECT;
+static boolean initialiseEffect = true; // shows if it is a first iteration
+static boolean brightnessDirection;
+static boolean powerOn = false;
+
+
+// 1, 2, 3 bits - brightness (possible values: 1-8)
+// 4, 5, 6, 7 bits - effect runtime value (mostly speed, 1-16)
+// 8th bit - 1 if the whole parameter is loaded from EEPROM, 0 if default
+
+static uint8_t brightnessLevels[NUM_EFFECTS] = {};
+
+#define NUM_LEVELS 8
+static const uint8_t brightnessLevelMapping[NUM_LEVELS] PROGMEM = { 8, 16, 32, 64, 80, 128, 192, 255 };
+
+inline uint8_t getBrightness() {
+    uint8_t level = brightnessLevels[currentEffect];
+    return pgm_read_byte(&brightnessLevelMapping[level < NUM_LEVELS ? level : DEFAULT_BRIGHTNESS_LEVEL]);
+}
+
+inline void setLedBrightness() {
+    FastLED.setBrightness(getBrightness());
 }
 
 void effectsTick() {
+    if (!powerOn) {
+        return;
+    }
+
+    if (initialiseEffect) {
+        clearPixels();
+        setLedBrightness();
+        delay(100);
+    }
     uint32_t now = millis();
-    if (powerOn && timeDiff(now, effTimer) >= DEFAULT_SPEED) {
+    if (timeDiff(now, effTimer) >= DEFAULT_SPEED) {
         effTimer = now;
 
         switch (currentEffect) {
@@ -156,15 +152,15 @@ void changePower() {
     effectsTick();
 
     if (powerOn) {
-        uint8_t brightness = brightnessLevel * 32 + 31;
-        for (int i = 0; i < brightnessLevel; i += 8) {
+        uint8_t brightness = getBrightness();
+        for (int i = 0; i < brightness; i += 8) {
             FastLED.setBrightness(i);
             delay(1);
             FastLED.show();
         }
         FastLED.setBrightness(brightness);
     } else {
-        uint8_t brightness = brightnessLevel * 32 + 31;
+        uint8_t brightness = getBrightness();
         for (int i = brightness; i > 8; i -= 8) {
             FastLED.setBrightness(i);
             delay(1);
@@ -177,6 +173,48 @@ void changePower() {
     FastLED.show();
 }
 
+
+void loadConfig() {
+    if (EEPROM.read(0) != 0xAA) {
+        // если настройки не были сохранены, заполняем дефолтами яркость
+        memset(&brightnessLevels, DEFAULT_BRIGHTNESS_LEVEL, NUM_EFFECTS);
+
+        currentEffect = SPARKLES_EFFECT;
+        return;
+    }
+
+    currentEffect = EEPROM.read(1);
+    if (currentEffect >= NUM_EFFECTS) {
+        currentEffect = 0;
+    }
+
+    for (byte i = 0; i < NUM_EFFECTS; i++) {
+        brightnessLevels[i] = EEPROM.read(i + 11); // (2-10 байт - резерв)
+    }
+}
+
+void saveConfig() {
+    if (EEPROM.read(0) != 0xAA) {
+        EEPROM.write(0, 0xAA);
+    }
+
+    if (EEPROM.read(1) != currentEffect) {
+        EEPROM.write(1, currentEffect);
+    }
+
+    for (byte i = 0; i < NUM_EFFECTS; i++) {
+        if (EEPROM.read(i + 11) != brightnessLevels[i]) {
+            EEPROM.write(i + 11, brightnessLevels[i]);
+        }
+    }
+}
+
+void resetConfig() {
+    EEPROM.write(0, 0);
+}
+
+void(* resetFunc) (void) = 0; //declare reset function @ address 0
+
 void buttonTick() {
     if (!Button::hasEvent()) {
         return;
@@ -187,75 +225,102 @@ void buttonTick() {
         return;
     }
 
-    if (event.type == Button::EVENT_CLICKS) {
-        switch (event.value) {
+    if (event.type == BUTTON_EVENT_CLICKS) {
+        switch (event.clicks) {
             case 1:
+                // включить/выключить
                 changePower();
                 break;
 
             case 2:
+                if (!powerOn) {
+                    return;
+                }
+
+                // следующий эффект
                 if (currentEffect == NUM_EFFECTS - 1) {
                     currentEffect = 0;
                 } else {
                     currentEffect++;
                 }
                 initialiseEffect = true;
-                FastLED.clear();
-                delay(1);
-                setBrightness();
 
                 break;
 
             case 3:
+                if (!powerOn) {
+                    return;
+                }
+
+                // предыдущий эффект
                 if (currentEffect == 0) {
                     currentEffect = NUM_EFFECTS - 1;
                 } else {
                     currentEffect--;
                 }
                 initialiseEffect = true;
-                FastLED.clear();
-                delay(1);
-                setBrightness();
 
                 break;
 
             case 4:
-                // save settings
+                if (!powerOn) {
+                    return;
+                }
+
+                // сохранить настройки яркости в энергонезависимой памяти
+                saveConfig();
+                flash(3, 100);
+
+                setLedBrightness();
                 break;
 
             default:
                 return;
         }
-    } else if (event.type == Button::EVENT_HOLDING) {
-        if (event.value == 1) {
+    } else if (event.type == BUTTON_EVENT_HOLDING) {
+        if (!powerOn) {
+            return;
+        }
+
+        // задержка кнопки - регулирование яркости
+        if (event.holdingTicks == 1) {
             brightnessDirection = !brightnessDirection;
         }
 
-        brightnessLevel += brightnessDirection ? 1 : -1;
+        int8_t level = brightnessLevels[currentEffect];
+        level += brightnessDirection ? 1 : -1;
 
-        if (brightnessLevel >= 8) {
-            brightnessLevel = 7;
+        if (level >= NUM_LEVELS) {
+            level = NUM_LEVELS - 1;
             flash(2, 100);
-        } else if (brightnessLevel < 0) {
-            brightnessLevel = 0;
+        } else if (level < 0) {
+            level = 0;
             flash(2, 100);
         }
 
-        setBrightness();
-    } else if (event.type == Button::EVENT_BOOT_HELD) {
-        // reset EEPROM
+        brightnessLevels[currentEffect] = level;
+
+        setLedBrightness();
+    } else if (event.type == BUTTON_EVENT_BOOT_HELD) {
+        // кнопка удерживалась при включении лампы - сброс настроек яркости
+        resetConfig();
         flash(5, 100);
+        resetFunc();
     }
 }
 
 void setup() {
+    loadConfig();
+    initialiseEffect = true;
+
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-    FastLED.setBrightness(DEFAULT_BRIGHTNESS);
-    FastLED.show();
 
     if (CURRENT_LIMIT > 0) {
         FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
     }
+
+    setLedBrightness();
+    FastLED.show();
 
     Button::setup(BTN_PIN);
 
@@ -264,8 +329,6 @@ void setup() {
 
 void loop() {
     effectsTick();
-
     Button::loop();
-
     buttonTick();
 }

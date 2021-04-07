@@ -5,13 +5,13 @@
 namespace Button {
     static uint8_t _pin;
 
+    static volatile bool on = false; // TODO use something more effective than bool
     static volatile bool touched = false; // кнопка нажата либо ожидается очередь нажатий
+
     static volatile byte clicks = 0; // счётчик кликов
     static volatile byte holdingTicks = 0; // счётчик тиков (как долго зажата кнопка)
 
     static volatile struct Event event;
-
-    static volatile bool on = false;
 
     static volatile unsigned long changedAt = 0;
 
@@ -33,8 +33,9 @@ namespace Button {
             if (!on) {
                 // Кнопка отпущена, но мы не знаем ничего о её нажатии - скорее всего она была зажата до запуска контроллера.
                 if (now >= BUTTON_BOOT_HELD_DURATION) {
-                    event.type = EVENT_BOOT_HELD;
-                    event.value = 0;
+                    event.type = BUTTON_EVENT_BOOT_HELD;
+                    event.clicks = 0;
+                    event.holdingTicks = 0;
                 }
             } else {
                 // Кнопка нажата - запоминаем
@@ -58,8 +59,9 @@ namespace Button {
             // Проверяем, когда до этого нажимали кнопку. Если в первые моменты после запуска контроллера, то возможно EVENT_BOOT_HELD
             if (changedAt <= BUTTON_BOOT_HELD_MAX_START_TIME) {
                 if (now >= BUTTON_BOOT_HELD_DURATION) {
-                    event.type = EVENT_BOOT_HELD;
-                    event.value = 0;
+                    event.type = BUTTON_EVENT_BOOT_HELD;
+                    event.clicks = 0;
+                    event.holdingTicks = 0;
                 }
                 touched = false;
                 resetCounters();
@@ -102,13 +104,15 @@ namespace Button {
             byte ticks = (timeSinceLastChange - BUTTON_START_HOLDING_TIME) / BUTTON_HOLDING_TICKS_PERIOD + 1;
             if (ticks != holdingTicks) {
                 holdingTicks = ticks;
-                event.type = EVENT_HOLDING;
-                event.value = holdingTicks;
+                event.type = BUTTON_EVENT_HOLDING;
+                event.clicks = clicks;
+                event.holdingTicks = holdingTicks;
             }
         } else if (!on && timeSinceLastChange >= BUTTON_MAX_SEQ_CLICKS_INTERVAL) {
             if (clicks && !holdingTicks) {
-                event.type = EVENT_CLICKS;
-                event.value = clicks;
+                event.type = BUTTON_EVENT_CLICKS;
+                event.clicks = clicks;
+                event.holdingTicks = 0;
             }
             touched = false;
             resetCounters();
@@ -116,16 +120,19 @@ namespace Button {
     }
 
     bool hasEvent() {
-        return event.type != EVENT_NONE;
+        return event.type != BUTTON_EVENT_NONE;
     }
 
     Event pullEvent() {
         struct Event res;
-        res.type = event.type;
-        res.value = event.value;
+        memcpy(&res, (const void *) &event, sizeof(event));
+//        res.type = event.type;
+//        res.clicks = event.clicks;
+//        res.holdingTicks = event.holdingTicks;
 
-        event.type = EVENT_NONE;
-        event.value = 0;
+        event.type = BUTTON_EVENT_NONE;
+        event.clicks = 0;
+        event.holdingTicks = 0;
         return res;
     }
 
