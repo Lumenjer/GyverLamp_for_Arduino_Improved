@@ -15,11 +15,11 @@
 #include <Arduino.h>
 #include <FastLED.h>
 #include <EEPROM.h>
+#include <InterruptDrivenButton.h>
 
 #include "constants.h"
 #include "effects.h"
 #include "leds.h"
-#include "button.h"
 #include "common.h"
 
 #define SPARKLES_EFFECT 0
@@ -56,6 +56,9 @@ static boolean powerOn = false;
 // 8th bit - 1 if the whole parameter is loaded from EEPROM, 0 if default
 
 static uint8_t brightnessLevels[NUM_EFFECTS] = {};
+
+static InterruptDrivenButton button(BTN_PIN);
+DEFINE_IDB_ISR(button)
 
 #define NUM_LEVELS 8
 static const uint8_t brightnessLevelMapping[NUM_LEVELS] PROGMEM = { 8, 16, 32, 64, 80, 128, 192, 255 };
@@ -213,19 +216,19 @@ void resetConfig() {
     EEPROM.write(0, 0);
 }
 
-void(* resetFunc) (void) = 0; //declare reset function @ address 0
+void(* resetFunc) () = nullptr; //declare reset function @ address 0
 
 void buttonTick() {
-    if (!Button::hasEvent()) {
+    if (!button.hasEvent()) {
         return;
     }
 
-    Button::Event event = Button::pullEvent();
+    InterruptDrivenButtonEvent event = button.pollEvent();
     if (!event.type) {
         return;
     }
 
-    if (event.type == BUTTON_EVENT_CLICKS) {
+    if (event.type == IDB_EVENT_CLICKS) {
         switch (event.clicks) {
             case 1:
                 // включить/выключить
@@ -277,13 +280,13 @@ void buttonTick() {
             default:
                 return;
         }
-    } else if (event.type == BUTTON_EVENT_HOLDING) {
+    } else if (event.type == IDB_EVENT_HOLD) {
         if (!powerOn) {
             return;
         }
 
         // задержка кнопки - регулирование яркости
-        if (event.holdingTicks == 1) {
+        if (event.holdTicks == 1) {
             brightnessDirection = !brightnessDirection;
         }
 
@@ -301,7 +304,7 @@ void buttonTick() {
         brightnessLevels[currentEffect] = level;
 
         setLedBrightness();
-    } else if (event.type == BUTTON_EVENT_BOOT_HELD) {
+    } else if (event.type == IDB_EVENT_BOOT_HOLD) {
         // кнопка удерживалась при включении лампы - сброс настроек яркости
         resetConfig();
         flash(5, 100);
@@ -322,13 +325,13 @@ void setup() {
     setLedBrightness();
     FastLED.show();
 
-    Button::setup(BTN_PIN);
+    button.setup(IDB_ISR(button));
 
     randomSeed(micros());
 }
 
 void loop() {
     effectsTick();
-    Button::loop();
+    button.loop();
     buttonTick();
 }
