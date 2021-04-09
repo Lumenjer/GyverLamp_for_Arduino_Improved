@@ -24,7 +24,7 @@ void drawPixelXY(uint8_t x, uint8_t y, CRGB color);
 CRGB getPixelValue(uint16_t pixNum);
 
 // функция получения цвета пикселя по его номеру
-uint32_t getPixelColor(uint8_t pixNum);
+uint32_t getPixelColor(uint16_t pixNum);
 
 // функция получения цвета пикселя в матрице по его координатам
 uint32_t getPixelColorXY(uint8_t x, uint8_t y);

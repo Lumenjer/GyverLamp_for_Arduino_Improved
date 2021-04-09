@@ -44,7 +44,7 @@ CRGB getPixelValue(uint16_t pixNum) {
 }
 
 // функция получения цвета пикселя по его номеру
-uint32_t getPixelColor(uint8_t pixNum) {
+uint32_t getPixelColor(uint16_t pixNum) {
     uint16_t thisPixel = pixNum * SEGMENTS;
     if (thisPixel < 0 || thisPixel > NUM_LEDS - 1) {
         return 0;
