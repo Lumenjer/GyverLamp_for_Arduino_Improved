@@ -1,4 +1,6 @@
-﻿# GyverLamp for Arduino 
+﻿# GyverLamp for Arduino (Improved) 
+
+GyverLamp for Arduino (Improved) v0.1.0
 
 Это оптимизированная версия прошивки Gyver Lamp для Arduino.
 
