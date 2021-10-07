@@ -108,11 +108,18 @@ uint32_t getPixelColorXY(uint8_t x, uint8_t y) {
 
 // получить номер пикселя в ленте по координатам
 uint16_t getPixelNumber(uint8_t x, uint8_t y) {
+#ifndef XY_EXTERN
     if ((THIS_Y % 2 == 0) || MATRIX_TYPE) {               // если чётная строка
         return (THIS_Y * _WIDTH + THIS_X);
     } else {                                              // если нечётная строка
         return (THIS_Y * _WIDTH + _WIDTH - THIS_X - 1);
     }
+#else
+    uint16_t i = (y * WIDTH) + x;
+    uint16_t j = pgm_read_dword(&XYTable[i]);
+    return j;
+#endif
+
 }
 
 inline void clearPixels() {

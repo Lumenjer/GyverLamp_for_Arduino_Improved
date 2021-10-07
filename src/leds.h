@@ -4,6 +4,9 @@
 #include <Arduino.h>
 #include <FastLED.h>
 #include "constants.h"
+#ifdef XY_EXTERN
+#include "XY.h"
+#endif
 
 // функции для работы с LED-матрицей
 
